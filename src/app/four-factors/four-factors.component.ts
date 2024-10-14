@@ -25450,7 +25450,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         for (let i = 0; i < events.length; i++) {
             const event = events[i];
             const elapsed_time = ((event.time.quarter.id - 1) * 600) + event.time.quarter.elapsed_seconds;
-            const player_id = String(event.player.number) + ' - ' + String(event.player.nickname);
+            const player_id = String(event.player.number) + ' - ' + event.player.nickname;
 
             if (min_elapsed_time !== null && max_elapsed_time !== null){
                 if (elapsed_time < min_elapsed_time || elapsed_time > max_elapsed_time){
@@ -25633,62 +25633,6 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
 
     get_four_factors_breakdown(selected_point: any) {
         const instance = this 
-        const homePlayers = selected_point.players.home;
-        const awayPlayers = selected_point.players.away;
-
-        type PlayerContribution = { name: string; value: number };
-        type TeamContributions = { [category: string]: PlayerContribution[] };
-
-        // Objetos para armazenar as contribuições dos jogadores por categoria
-        const homeContributions: TeamContributions = {};
-        const awayContributions: TeamContributions = {};
-
-        // Função auxiliar para calcular contribuições de jogadores por categoria
-        const calculateContributions = (
-            players: { [playerId: string]: { [category: string]: number } },
-            teamContributions: TeamContributions,
-            teamData: { [category: string]: number }
-        ) => {
-            // Itera sobre todos os jogadores
-            Object.keys(players).forEach(playerId => {
-                // Para cada jogador, itera sobre todas as categorias que o jogador possui
-                Object.keys(players[playerId]).forEach(category => {
-                    const playerValue = players[playerId]?.[category] || 0; // Verifica se o valor existe, caso contrário, usa 0
-                    if (playerValue > 0) {  // Inclui apenas jogadores com valores maiores que zero
-                        // Verifica se já existe uma chave para a categoria no objeto de contribuições
-                        if (!teamContributions[category]) {
-                            teamContributions[category] = [];
-                        }
-                        // Adiciona a contribuição do jogador na categoria correspondente
-                        teamContributions[category].push({ name: playerId, value: playerValue });
-                    }
-                });
-            });
-        
-            // Verifica a diferença para o valor total do time em cada categoria e adiciona a contribuição "Team"
-            Object.keys(teamData).forEach(category => {
-                const teamCategoryTotal = teamData[category] || 0;
-                const calculatedCategoryTotal = (teamContributions[category] || []).reduce(
-                    (sum: number, contribution: PlayerContribution) => sum + contribution.value, 0
-                );
-                
-                if (teamCategoryTotal - calculatedCategoryTotal > 0.01) {
-                    if (!teamContributions[category]) {
-                        teamContributions[category] = [];
-                    }
-                    // Adiciona a contribuição faltante como "Team"
-                    teamContributions[category].push({ name: 'Team', value: teamCategoryTotal - calculatedCategoryTotal });
-                }
-            });
-        };
-        
-        // Soma as contribuições dos jogadores de "home" e "away"
-        calculateContributions(homePlayers, homeContributions, selected_point.home);
-        calculateContributions(awayPlayers, awayContributions, selected_point.away);
-
-        console.log('Home Contributions:', homeContributions);
-        console.log('Away Contributions:', awayContributions);
-
         const chartOptions: Highcharts.Options = {
             chart: {
                 type: 'bar',

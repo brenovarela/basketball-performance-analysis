@@ -104,6 +104,7 @@ export class CategoryModalComponent {
       },
       yAxis: {
         min: 0,
+        max: 100,
         title: {
           text: 'Contribution'
         },
