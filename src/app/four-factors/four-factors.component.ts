@@ -32,6 +32,26 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
     
 
     constructor(private modalService: NgbModal, private zone: NgZone) {} // Injeção do NgbModal e NgZone
+    intervalId: any;
+
+    startInterval(segundos = 10) {
+        this.intervalId = setInterval(async () => {
+            const selected_league = $('#select-league').val(); // Obtém o valor selecionado
+            const selected_team = $('#select-team').val(); // Obtém o valor selecionado
+            const selected_match = $('#select-match').val();
+
+            if (selected_match !== null && selected_match !== ''){
+                console.log(selected_match)
+                this.events = await this.getAllMatchEvents(selected_league, selected_team, selected_match); // Chama a função a cada 30 segundos
+            }
+        }, segundos * 1000); // 30000 milissegundos = 30 segundos
+    }
+
+    clearInterval() {
+        if (this.intervalId) {
+            clearInterval(this.intervalId); // Limpa o intervalo
+        }
+    }
 
     
     events = [
@@ -24980,7 +25000,11 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         }
     ]
 
+    current_page = 1;
+    current_page_items = 0
+
     ngOnInit(): void {
+        this.startInterval();
         // Inicialize dados ou faça chamadas para APIs se necessário
         let four_factors = this.calculateFourFactors(this.events)
         let selected_point = four_factors.at(-1)
@@ -25033,19 +25057,20 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             if (selected_team && selected_league && selected_match) {
               try {
                 // Chama a função com await dentro do 'async' para buscar todos os eventos
+                this.current_page = 1
                 const events = await this.getAllMatchEvents(Number(selected_league), Number(selected_team), Number(selected_match));
-                let four_factors = this.calculateFourFactors(events);
-                this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
-                this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
-                this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
-                this.fill_charts_four_factors(four_factors, 'DRB %', 'chart-drb', 'drb')
-                this.fill_charts_four_factors(four_factors, 'FTR %', 'chart-ftr', 'ft')
+                
               
               } catch (error) {
                 console.error('Erro ao obter os eventos:', error);
               }
             }
         });
+    }
+
+    ngOnDestroy() {
+    // Limpa o intervalo ao destruir o componente para evitar chamadas desnecessárias
+        this.clearInterval();
     }
 
     fill_select_leagues(): void {
@@ -25375,8 +25400,6 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
     league_id: number,
     team_id: number,
     match_id: number,
-    page: number = 1,
-    accumulatedEvents: any[] = []
   ): Promise<any[]> {
     // URL da API para obter os eventos da partida
     const apiUrl = `https://apibird.tecgraf.puc-rio.br/v1/events/${league_id}/${match_id}`;
@@ -25389,22 +25412,43 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhcGlfdG9rZW46MyIsInNjb3BlcyI6ImNvcmUifQ.CQgdjWXTWTtr9pwUliGo0__1_5rcEHj4tTxqpCZUekc'
         },
         data: {
-          page: page
+          page: this.current_page
         }
       });
-  
+      console.log(`Pesquisando página ${this.current_page}`)
       // Acumula os eventos da página atual
-      accumulatedEvents = accumulatedEvents.concat(response['data']);
       const total_pages = Math.ceil(response['total'] / 100); // Ajuste o tamanho da página conforme necessário
+      let accumulatedEvents = this.events;
   
       // Verifica se há mais páginas para buscar
-      if (page < total_pages) {
+      if (this.current_page < total_pages) {
         // Se há mais páginas, chama recursivamente para a próxima página
-        return await this.getAllMatchEvents(league_id, team_id, match_id, page + 1, accumulatedEvents);
+        this.current_page += 1
+        accumulatedEvents = accumulatedEvents.concat(response['data']);
+        return await this.getAllMatchEvents(league_id, team_id, match_id);
       } else {
-        // Se esta é a última página, retorna todos os eventos acumulados
+        const existingEventIds = new Set(this.events.map(event => event.event_id));
+        const filteredData = response['data'].filter((item: any) => !existingEventIds.has(item.event_id));
+        
+        accumulatedEvents = accumulatedEvents.concat(filteredData);
+        if (filteredData.length !== 0){
+            console.log(filteredData)
+            let four_factors = this.calculateFourFactors(accumulatedEvents);
+            this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
+            this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
+            this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
+            this.fill_charts_four_factors(four_factors, 'DRB %', 'chart-drb', 'drb')
+            this.fill_charts_four_factors(four_factors, 'FTR %', 'chart-ftr', 'ft')
+    
+            let selected_point = four_factors.at(-1)
+            this.get_four_factors_breakdown(selected_point)
+        }else{
+            console.log('Sem nenhum novo evento')
+        }
+
         return accumulatedEvents;
       }
+      
     } catch (error) {
       console.error('Erro ao carregar os eventos:', error);
       throw error; // Lança o erro para ser tratado externamente
