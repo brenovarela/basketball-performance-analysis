@@ -25006,15 +25006,15 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
     ngOnInit(): void {
         this.startInterval();
         // Inicialize dados ou faça chamadas para APIs se necessário
-        let four_factors = this.calculateFourFactors(this.events)
-        let selected_point = four_factors.at(-1)
+        // let four_factors = this.calculateFourFactors(this.events)
+        // let selected_point = four_factors.at(-1)
         
-        this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
-        this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
-        this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
-        this.fill_charts_four_factors(four_factors, 'DRB %', 'chart-drb', 'drb')
-        this.fill_charts_four_factors(four_factors, 'FTR %', 'chart-ftr', 'ft')
-        this.get_four_factors_breakdown(selected_point)
+        // this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
+        // this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
+        // this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
+        // this.fill_charts_four_factors(four_factors, 'DRB %', 'chart-drb', 'drb')
+        // this.fill_charts_four_factors(four_factors, 'FTR %', 'chart-ftr', 'ft')
+        // this.get_four_factors_breakdown(selected_point)
         
     }
 
@@ -25022,6 +25022,10 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         // Inicializa o Select2 no elemento com o id "select2-example"
         // $('#select-league').select2();
         this.fill_select_team()
+
+        $(document).ready(() => {
+            $('#liveToast').toast({ autohide: true, delay: 5000 });
+        });
         
 
         $('#select-league').on('change', (event: any) => {
@@ -25055,17 +25059,31 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             const selected_match = $('#select-match').val(); // Obtém o valor selecionado
     
             if (selected_team && selected_league && selected_match) {
-              try {
-                // Chama a função com await dentro do 'async' para buscar todos os eventos
-                this.current_page = 1
-                const events = await this.getAllMatchEvents(Number(selected_league), Number(selected_team), Number(selected_match));
-                
-              
-              } catch (error) {
-                console.error('Erro ao obter os eventos:', error);
-              }
+                try {
+                    // Chama a função com await dentro do 'async' para buscar todos os eventos
+                    this.current_page = 1
+                    $("#charts-container").hide()
+                    $('#loader').show();
+                    this.events = []
+                    this.events = await this.getAllMatchEvents(Number(selected_league), Number(selected_team), Number(selected_match));
+                    $('#loader').hide();
+                    console.log(this.events)
+                    if (this.events.length !== 0){
+                        $("#charts-container").show()
+                    }
+                    else{
+                        this.showNotification('Nenhum dado retornado') 
+                    }
+                } catch (error) {
+                    console.error('Erro ao obter os eventos:', error);
+                }
             }
         });
+    }
+
+    showNotification(message: string) {
+        $('.toast-body').text(message);
+        $('#liveToast').toast('show');
     }
 
     ngOnDestroy() {
@@ -25116,9 +25134,10 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhcGlfdG9rZW46MyIsInNjb3BlcyI6ImNvcmUifQ.CQgdjWXTWTtr9pwUliGo0__1_5rcEHj4tTxqpCZUekc' // Adiciona o cabeçalho de autorização
         },
         data: {
-            league: league_id
+            league: league_id,
         },
         success: (data: Array<any>) => {
+            data = data.reverse()
             const selectData = data.map((year: number) => {
                 return { id: year, text: year.toString() }; // Define o formato esperado pelo Select2
             });
@@ -25184,21 +25203,59 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         season: season,
         team: team_id,
         sort: 'date',
-        order: 'desc'
+        order: 'desc',
+        limit: 200
       },
       success: (response: Record<string, any>) => {
         const data = response['data'];
   
         const selectData = data.map((match: any) => {
-          return { id: match.match_id, text: match.name }; // Define o formato esperado pelo Select2
+            // Extraindo a parte do placar e da data
+            const [score, rawDate] = match.name.split('(');
+            
+            // Formata a data para o formato DD/MM/YYYY HH:mm
+            const matchDate = new Date(rawDate.replace(')', ''));
+            const formattedDate = matchDate.toLocaleDateString('pt-BR') + ' ' + matchDate.toLocaleTimeString('pt-BR', {
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            
+            // Retorna o objeto com o placar separado da data
+            return {
+                id: match.match_id,
+                score: score.trim(),
+                date: formattedDate
+            };
         });
-  
+        
         $('#select-match').html('<option></option>');
-  
+        
         $('#select-match').select2({
-          data: selectData,
-          placeholder: 'Selecione uma partida',
-          allowClear: true
+            data: selectData,
+            placeholder: 'Selecione uma partida',
+            allowClear: true,
+            escapeMarkup: function(markup: any) {
+                return markup; // Permite o HTML personalizado
+            },
+            templateResult: function(data: any) {
+                // Verifica se o item possui informações válidas
+                if (!data.id) {
+                    return data.text; // Para o placeholder ou resultados sem conteúdo
+                }
+        
+                // Cria o HTML customizado com o placar e a data
+                const markup = `
+                    <div>
+                        <strong>${data.score}</strong><br>
+                        <small style="color: gray;">${data.date}</small>
+                    </div>
+                `;
+        
+                return $(markup);
+            },
+            templateSelection: function(data: any) {
+                return data.score || data.text;
+            }
         });
   
   

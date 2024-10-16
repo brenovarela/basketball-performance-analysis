@@ -45,7 +45,7 @@ export class CategoryModalComponent {
     // Soma as contribuições dos jogadores de "home"
     Object.keys(homePlayers).forEach(playerId => {
         const playerValue = homePlayers[playerId]?.[mappedCategory] || 0; // Verifica se o valor existe, caso contrário, usa 0
-        if (playerValue > 0) {  // Inclui apenas jogadores com valores maiores que zero
+        if (playerValue > 0.01) {  // Inclui apenas jogadores com valores maiores que zero
             homeContributions.push({ name: `${playerId}`, value: playerValue });
             homeTotal += playerValue;
         }
@@ -54,7 +54,7 @@ export class CategoryModalComponent {
     // Soma as contribuições dos jogadores de "away"
     Object.keys(awayPlayers).forEach(playerId => {
         const playerValue = awayPlayers[playerId]?.[mappedCategory] || 0; // Verifica se o valor existe, caso contrário, usa 0
-        if (playerValue > 0) {  // Inclui apenas jogadores com valores maiores que zero
+        if (playerValue > 0.01) {  // Inclui apenas jogadores com valores maiores que zero
             awayContributions.push({ name: `${playerId}`, value: playerValue });
             awayTotal += playerValue;
         }
