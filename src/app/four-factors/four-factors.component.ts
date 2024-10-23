@@ -25006,15 +25006,15 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
     ngOnInit(): void {
         this.startInterval();
         // Inicialize dados ou faça chamadas para APIs se necessário
-        // let four_factors = this.calculateFourFactors(this.events)
-        // let selected_point = four_factors.at(-1)
+        let four_factors = this.calculateFourFactors(this.events)
+        let selected_point = four_factors.at(-1)
         
-        // this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
-        // this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
-        // this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
-        // this.fill_charts_four_factors(four_factors, 'DRB %', 'chart-drb', 'drb')
-        // this.fill_charts_four_factors(four_factors, 'FTR %', 'chart-ftr', 'ft')
-        // this.get_four_factors_breakdown(selected_point)
+        this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
+        this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
+        this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
+        this.fill_charts_four_factors(four_factors, 'DRB %', 'chart-drb', 'drb')
+        this.fill_charts_four_factors(four_factors, 'FTR %', 'chart-ftr', 'ft')
+        this.get_four_factors_breakdown(selected_point)
         
     }
 
@@ -25057,6 +25057,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             const selected_league = $('#select-league').val(); // Obtém o valor selecionado
             const selected_team = $('#select-team').val(); // Obtém o valor selecionado
             const selected_match = $('#select-match').val(); // Obtém o valor selecionado
+            console.log(`Pesquisando jogo ${$('#select-match').select2('data')[0].score}`)
     
             if (selected_team && selected_league && selected_match) {
                 try {
@@ -25275,6 +25276,46 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
     serie: keyof FourFactorsMetrics
   ) {
     const instance = this
+
+    function formatTimeForQuarterAndOT(elapsedSeconds: number): string {
+        const quarterLength = 600; // 10 minutos (600 segundos) por quarter
+        const otLength = 300; // 5 minutos (300 segundos) por prorrogação (OT)
+        
+        if (elapsedSeconds < 4 * quarterLength) {
+          // Estamos nos quatro primeiros quarters
+          const quarter = Math.floor(elapsedSeconds / quarterLength) + 1; // Calcula o quarter (1-based)
+          const timeInQuarter = elapsedSeconds % quarterLength; // Tempo decorrido dentro do quarter
+          const minutesRemaining = Math.floor((quarterLength - timeInQuarter) / 60); // Minutos restantes no quarter
+          const secondsRemaining = (quarterLength - timeInQuarter) % 60; // Segundos restantes no quarter
+      
+          // Se estivermos exatamente no início de um quarter, marcamos o início do quarter
+          if (timeInQuarter === 0) {
+            return `Q${quarter}`; // Indica o início do quarter
+          }
+      
+          // Caso contrário, mostramos o tempo restante no quarter
+          return `${minutesRemaining}:${secondsRemaining.toString().padStart(2, '0')}`;
+        } else {
+          // Estamos nas prorrogações
+          const otPeriod = Math.floor((elapsedSeconds - 4 * quarterLength) / otLength) + 1; // Calcula a prorrogação (OT1, OT2, etc.)
+          const timeInOT = (elapsedSeconds - 4 * quarterLength) % otLength; // Tempo decorrido dentro da prorrogação
+          const minutesRemainingOT = Math.floor((otLength - timeInOT) / 60); // Minutos restantes na prorrogação
+          const secondsRemainingOT = (otLength - timeInOT) % 60; // Segundos restantes na prorrogação
+      
+          // Se estivermos exatamente no início de uma prorrogação, indicamos o início da prorrogação
+          if (timeInOT === 0) {
+            return `OT${otPeriod}`; // Indica o início da prorrogação
+          }
+      
+          // Caso contrário, mostramos o tempo restante na prorrogação
+          return `${minutesRemainingOT}:${secondsRemainingOT.toString().padStart(2, '0')}`;
+        }
+      }
+      
+      // Gerar as categorias no formato de quarters, prorrogações e tempo restante
+    // const formattedCategories = four_factors.map(f => formatTimeForQuarterAndOT(f.elapsed_time));
+    const formattedCategories = four_factors.map(f => String(f.elapsed_time));
+      
     const chartOptions: Highcharts.Options = {
       chart: {
         type: 'line',
@@ -25361,7 +25402,14 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           color: 'rgba(0, 0, 0, 0.4)', // Define a cor do crosshair (preto com 70% de opacidade)
           dashStyle: 'Solid', // Define o estilo da linha
         },
-        categories: four_factors.map(f => f.elapsed_time.toString())
+        categories: formattedCategories,
+        labels: {
+            formatter: function () {
+              // Exibe apenas as labels relevantes (início de quarters e tempos restantes)
+              const label = formatTimeForQuarterAndOT(Number(this.value)) ;
+              return label.includes('Q') || label.includes('OT') ? label : ''; 
+            }
+          }
       },
       yAxis: {
         title: {
@@ -25421,6 +25469,10 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           point: {
             events: {
               click: function () {
+                const xIndex = this.x; // Captura o índice do ponto clicado no eixo X
+
+                // Desenha o crosshair nos gráficos específicos no mesmo índice
+                instance.updateSpecificChartsCrosshair(xIndex);                
                 const selected_point = four_factors.filter(objeto => String(objeto.elapsed_time) === this.category).at(-1)
 
                 // Agora você pode chamar um método da sua classe usando 'self'
@@ -25453,6 +25505,32 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
     this.charts.push(chart);
   }
 
+  updateSpecificChartsCrosshair(xIndex: number | null) {
+    const chartIds = ['chart-efg', 'chart-tov', 'chart-orb', 'chart-drb', 'chart-ftr']; // IDs dos gráficos
+  
+    chartIds.forEach(chartId => {
+      const chart = $(`#${chartId}`).highcharts()// Obtém o gráfico pelo ID do contêiner
+
+      if (chart) {
+        const xAxis = chart.xAxis[0];
+  
+        // Remove qualquer crosshair existente
+        xAxis.removePlotLine('fixedCrosshair');
+  
+        if (xIndex !== null) {
+          // Desenha o novo crosshair no gráfico específico
+          xAxis.addPlotLine({
+            value: xIndex,  // Usa o índice do eixo X (número) clicado
+            color: 'rgba(0, 0, 0, 0.4)',
+            width: 1,
+            id: 'fixedCrosshair',
+            zIndex: 3
+          });
+        }
+      }
+    });
+  }
+
   async getAllMatchEvents(
     league_id: number,
     team_id: number,
@@ -25472,7 +25550,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           page: this.current_page
         }
       });
-      console.log(`Pesquisando página ${this.current_page}`)
+      console.log(`Pesquisando página ${this.current_page} | Eventos: ${this.events.length}`)
       // Acumula os eventos da página atual
       const total_pages = Math.ceil(response['total'] / 100); // Ajuste o tamanho da página conforme necessário
       let accumulatedEvents = this.events;
@@ -25482,6 +25560,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         // Se há mais páginas, chama recursivamente para a próxima página
         this.current_page += 1
         accumulatedEvents = accumulatedEvents.concat(response['data']);
+        console.log(response['data'].lenght)
         return await this.getAllMatchEvents(league_id, team_id, match_id);
       } else {
         const existingEventIds = new Set(this.events.map(event => event.event_id));
@@ -25598,11 +25677,12 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             const currentPlayerStats = playerStats[currentTeam][player_id];  // Estatísticas do jogador
 
             // Atualiza as estatísticas do jogador e do time com base no evento
-            if (['A2C', 'A2E', 'A3C', 'A3E'].includes(event.code)) {
+            // 'ENT', 'ENE'
+            if (['A2C', 'A2E', 'A3C', 'A3E', 'ENT', 'ENE'].includes(event.code)) {
                 currentStats.tentativas_arremessos++;
                 currentPlayerStats.tentativas_arremessos++;  // Atualiza também para o jogador
 
-                if (['A2C', 'A3C'].includes(event.code)) {
+                if (['A2C', 'A3C', 'ENT'].includes(event.code)) {
                     currentStats.arremessos_convertidos++;
                     currentPlayerStats.arremessos_convertidos++;  // Atualiza também para o jogador
 
@@ -25613,7 +25693,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 }
             }
 
-            if (['ERR', 'FAO', 'FAT', 'V24', 'V3S', 'V5S', 'V8S', 'VIA', 'VIC', 'VSQ', 'VVC'].includes(event.code)) {
+            if (['ERR', 'FAO', 'V24', 'V3S', 'V5S', 'V8S', 'VIA', 'VIC', 'VSQ', 'VVC'].includes(event.code)) {
                 currentStats.turnouvers++;
                 currentPlayerStats.turnouvers++;  // Atualiza também para o jogador
             }
@@ -25656,9 +25736,9 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                     ? 0
                     : sideStats.rebotes_defesa / (sideStats.rebotes_defesa + oppositeStats.rebotes_ataque);
 
-                const ft = sideStats.tentativas_lance_livre === 0
+                const ft = sideStats.tentativas_arremessos === 0
                     ? 0
-                    : sideStats.lances_livres_convertidos / sideStats.tentativas_lance_livre;
+                    : sideStats.lances_livres_convertidos / sideStats.tentativas_arremessos;
 
                 return { efg, tov, orb, drb, ft };
             };
