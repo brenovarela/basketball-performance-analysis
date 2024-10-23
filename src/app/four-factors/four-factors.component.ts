@@ -25277,40 +25277,54 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
   ) {
     const instance = this
 
+    function calculateQuarter(elapsedSeconds: number, quarterLength: number): number {
+        // Calcula o quarter atual (0-based)
+        return Math.floor(elapsedSeconds / quarterLength);
+    }
+    
+    function calculateTimeRemaining(elapsedSeconds: number, quarterLength: number): string {
+        const timeInQuarter = elapsedSeconds % quarterLength; // Tempo decorrido dentro do quarter
+        const minutesRemaining = Math.floor((quarterLength - timeInQuarter) / 60); // Minutos restantes no quarter
+        const secondsRemaining = (quarterLength - timeInQuarter) % 60; // Segundos restantes no quarter
+        return `${minutesRemaining}:${secondsRemaining.toString().padStart(2, '0')}`;
+    }
+    
     function formatTimeForQuarterAndOT(elapsedSeconds: number): string {
         const quarterLength = 600; // 10 minutos (600 segundos) por quarter
         const otLength = 300; // 5 minutos (300 segundos) por prorrogação (OT)
         
-        if (elapsedSeconds < 4 * quarterLength) {
-          // Estamos nos quatro primeiros quarters
-          const quarter = Math.floor(elapsedSeconds / quarterLength) + 1; // Calcula o quarter (1-based)
-          const timeInQuarter = elapsedSeconds % quarterLength; // Tempo decorrido dentro do quarter
-          const minutesRemaining = Math.floor((quarterLength - timeInQuarter) / 60); // Minutos restantes no quarter
-          const secondsRemaining = (quarterLength - timeInQuarter) % 60; // Segundos restantes no quarter
-      
-          // Se estivermos exatamente no início de um quarter, marcamos o início do quarter
-          if (timeInQuarter === 0) {
-            return `Q${quarter}`; // Indica o início do quarter
-          }
-      
-          // Caso contrário, mostramos o tempo restante no quarter
-          return `${minutesRemaining}:${secondsRemaining.toString().padStart(2, '0')}`;
+        if (elapsedSeconds <= 4 * quarterLength) {
+            // Estamos nos quatro primeiros quarters
+            const quarter = calculateQuarter(elapsedSeconds, quarterLength);
+            const timeInQuarter = elapsedSeconds % quarterLength; // Tempo decorrido dentro do quarter
+    
+            // Se estivermos exatamente no início de um quarter, marcamos o início do quarter
+            if (timeInQuarter === 0) {
+                if (quarter == 0) {
+                    return '10:00';
+                } else {
+                    return `Q${quarter}`; // Indica o início do quarter
+                }
+            }
+    
+            // Caso contrário, mostramos o tempo restante no quarter
+            return calculateTimeRemaining(elapsedSeconds, quarterLength);
         } else {
-          // Estamos nas prorrogações
-          const otPeriod = Math.floor((elapsedSeconds - 4 * quarterLength) / otLength) + 1; // Calcula a prorrogação (OT1, OT2, etc.)
-          const timeInOT = (elapsedSeconds - 4 * quarterLength) % otLength; // Tempo decorrido dentro da prorrogação
-          const minutesRemainingOT = Math.floor((otLength - timeInOT) / 60); // Minutos restantes na prorrogação
-          const secondsRemainingOT = (otLength - timeInOT) % 60; // Segundos restantes na prorrogação
-      
-          // Se estivermos exatamente no início de uma prorrogação, indicamos o início da prorrogação
-          if (timeInOT === 0) {
-            return `OT${otPeriod}`; // Indica o início da prorrogação
-          }
-      
-          // Caso contrário, mostramos o tempo restante na prorrogação
-          return `${minutesRemainingOT}:${secondsRemainingOT.toString().padStart(2, '0')}`;
+            // Estamos nas prorrogações
+            const otPeriod = Math.floor((elapsedSeconds - 4 * quarterLength) / otLength) + 1; // Calcula a prorrogação (OT1, OT2, etc.)
+            const timeInOT = (elapsedSeconds - 4 * quarterLength) % otLength; // Tempo decorrido dentro da prorrogação
+            const minutesRemainingOT = Math.floor((otLength - timeInOT) / 60); // Minutos restantes na prorrogação
+            const secondsRemainingOT = (otLength - timeInOT) % 60; // Segundos restantes na prorrogação
+    
+            // Se estivermos exatamente no início de uma prorrogação, indicamos o início da prorrogação
+            if (timeInOT === 0) {
+                return `OT${otPeriod}`; // Indica o início da prorrogação
+            }
+    
+            // Caso contrário, mostramos o tempo restante na prorrogação
+            return `${minutesRemainingOT}:${secondsRemainingOT.toString().padStart(2, '0')}`;
         }
-      }
+    }
       
       // Gerar as categorias no formato de quarters, prorrogações e tempo restante
     // const formattedCategories = four_factors.map(f => formatTimeForQuarterAndOT(f.elapsed_time));
@@ -25404,6 +25418,8 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         },
         categories: formattedCategories,
         labels: {
+            step: 1, // Força a exibição de todos os labels
+            rotation: 0,
             formatter: function () {
               // Exibe apenas as labels relevantes (início de quarters e tempos restantes)
               const label = formatTimeForQuarterAndOT(Number(this.value)) ;
@@ -25437,30 +25453,43 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           return { x: this.chart.chartWidth - labelWidth - 10, y: 10 };
         },
         formatter: function () {
-          let s = '<b>Elapsed Time: ' + this.x + '</b><br/>';
-          if (this.points) {
-            this.points.forEach(function (point) {
-              s +=
+            const formattedTime = formatTimeForQuarterAndOT(Number(this.x));
+            let quarterIndicator = '';
+            
+            // Identifica se é um quarter ou overtime (OT)
+            if (formattedTime.includes('Q')) {
+                quarterIndicator = `Quarter: ${formattedTime}`;
+            } else if (formattedTime.includes('OT')) {
+                quarterIndicator = `Overtime: ${formattedTime}`;
+            } else {
+                quarterIndicator = `Quarter: ${Math.floor(Number(this.x) / 600) + 1}`;
+            }
+        
+            let s = `<b>${quarterIndicator}</b><br/><b>Remaining Time: ${formattedTime}</b><br/>`;
+        
+            if (this.points) {
+                this.points.forEach(function (point) {
+                s +=
+                    '<span style="color:' +
+                    point.color +
+                    '">'+point.series.name + '</span> ' +
+                    ': ' +
+                    point.y?.toFixed(2) +
+                    '%' +
+                    '<br/>';
+                });
+            } else if (this.point) {
+                s +=
                 '<span style="color:' +
-                point.color +
-                '">'+point.series.name + '</span> ' +
+                this.point.color +
+                '">\u25CF</span> ' +
+                this.point.series.name +
                 ': ' +
-                point.y?.toFixed(2) +
+                this.point.y?.toFixed(2) +
                 '%' +
                 '<br/>';
-            });
-          } else if (this.point) {
-            s +=
-              '<span style="color:' +
-              this.point.color +
-              '">\u25CF</span> ' +
-              this.point.series.name +
-              ': ' +
-              this.point.y?.toFixed(2) +
-              '%' +
-              '<br/>';
-          }
-          return s;
+            }
+            return s;
         }
       },
       plotOptions: {
@@ -25802,7 +25831,8 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 current_evaluation.players.away[playerId] = calculatePlayerFactors(playerStats.away[playerId], stats.away, stats.home);
             });
 
-            four_factors.push(current_evaluation);
+            if (four_factors.at(-1)?.elapsed_time !== elapsed_time)
+                four_factors.push(current_evaluation);
         }
 
         console.log(four_factors.at(-1))
