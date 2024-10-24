@@ -7,7 +7,6 @@ import { MatDialog } from '@angular/material/dialog';
 import { CategoryModalComponent } from '../category-modal/category-modal.component';  // Ajuste conforme necessário
 
 
-
 interface FourFactorsMetrics {
     efg: number | null;
     tov: number | null;
@@ -42,6 +41,8 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
 
             if (selected_match !== null && selected_match !== ''){
                 console.log(selected_match)
+                // this.current_page = 1
+                // this.events = []
                 this.events = await this.getAllMatchEvents(selected_league, selected_team, selected_match); // Chama a função a cada 30 segundos
             }
         }, segundos * 1000); // 30000 milissegundos = 30 segundos
@@ -54,6 +55,10 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
     }
 
     
+
+    home_players = []
+    away_players = []
+
     events = [
         {
             "match": {
@@ -25066,6 +25071,8 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                     $("#charts-container").hide()
                     $('#loader').show();
                     this.events = []
+                    this.get_home_and_away_players(Number(selected_league), Number(selected_match))
+                    console.log(this.home_players, 'aqui 1')
                     this.events = await this.getAllMatchEvents(Number(selected_league), Number(selected_team), Number(selected_match));
                     $('#loader').hide();
                     console.log(this.events)
@@ -25122,6 +25129,71 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         }
         });
     }
+
+    get_match_players(league_id: number, match_id: number, teams: any): any {
+        // URL da API - substitua pelo endpoint real da sua API
+        const apiUrl = `https://apibird.tecgraf.puc-rio.br/v1/matches/${league_id}/${match_id}/players`; 
+
+        // Fazendo a requisição AJAX com jQuery para obter os dados
+        $.ajax({
+        url: apiUrl,
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhcGlfdG9rZW46MyIsInNjb3BlcyI6ImNvcmUifQ.CQgdjWXTWTtr9pwUliGo0__1_5rcEHj4tTxqpCZUekc' // Adiciona o cabeçalho de autorização
+        },
+        success: (data: any) => {
+            const colors = Highcharts.getOptions().colors || []; 
+
+            if (teams.home !== undefined){
+                this.home_players = data[teams.home]
+                    .sort((a:any, b:any) => b.id - a.id)
+                    .map((player: any, index: number) => {
+                        return {
+                            ...player, // Copia todos os atributos existentes do jogador
+                            color: colors[index % colors.length] // Atribui uma cor baseada no índice, usando cores de forma cíclica
+                        };
+                    });
+
+            }
+
+            if (teams.away !== undefined){
+                this.away_players = data[teams.away]
+                    .sort((a:any, b:any) => b.id - a.id)
+                    .map((player: any, index: number) => {
+                        return {
+                            ...player, // Copia todos os atributos existentes do jogador
+                            color: colors[index % colors.length] // Atribui uma cor baseada no índice, usando cores de forma cíclica
+                        };
+                    });
+            }
+        },
+        error: (error: Record<string, any>) => {
+            console.error('Erro ao carregar os dados:', error); 
+        }
+        });
+    }  
+
+
+    get_home_and_away_players(league_id: number, match_id: number): any {
+        // URL da API - substitua pelo endpoint real da sua API
+        const apiUrl = `https://apibird.tecgraf.puc-rio.br/v1/matches/${league_id}/${match_id}`; 
+
+        // Fazendo a requisição AJAX com jQuery para obter os dados
+        $.ajax({
+        url: apiUrl,
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhcGlfdG9rZW46MyIsInNjb3BlcyI6ImNvcmUifQ.CQgdjWXTWTtr9pwUliGo0__1_5rcEHj4tTxqpCZUekc' // Adiciona o cabeçalho de autorização
+        },
+        success: (data: { home_team: { name: string }, away_team: { name: string } }) => {
+            let teams = {'home': data.home_team.name, 'away': data.away_team.name}
+            this.get_match_players(league_id, match_id, teams)
+        },
+        error: (error: Record<string, any>) => {
+            console.error('Erro ao carregar os dados:', error); 
+        }
+        });
+    } 
 
     fill_select_season(league_id: any): void {
         // URL da API - substitua pelo endpoint real da sua API
@@ -25277,54 +25349,85 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
   ) {
     const instance = this
 
-    function calculateQuarter(elapsedSeconds: number, quarterLength: number): number {
-        // Calcula o quarter atual (0-based)
-        return Math.floor(elapsedSeconds / quarterLength);
-    }
-    
-    function calculateTimeRemaining(elapsedSeconds: number, quarterLength: number): string {
-        const timeInQuarter = elapsedSeconds % quarterLength; // Tempo decorrido dentro do quarter
-        const minutesRemaining = Math.floor((quarterLength - timeInQuarter) / 60); // Minutos restantes no quarter
-        const secondsRemaining = (quarterLength - timeInQuarter) % 60; // Segundos restantes no quarter
-        return `${minutesRemaining}:${secondsRemaining.toString().padStart(2, '0')}`;
-    }
-    
     function formatTimeForQuarterAndOT(elapsedSeconds: number): string {
+        // Usa a função calculateQuarter para determinar se é um quarter ou overtime
+        const period = calculateQuarter2(elapsedSeconds);
+    
+        // Usa a função calculateTimeRemainingInQuarter para determinar o tempo restante no período atual
+        const elapsed_seconds = calculateElapsedTimeInQuarter(elapsedSeconds);
+    
+        // Se estivermos exatamente no início de um quarter ou prorrogação, retorna o indicador apropriado
+        if (elapsed_seconds === '0:00') {
+            if (period !== 'Q0')
+                return period;
+        }
+
+        // Retorna o tempo restante no formato MM:SS
+        return elapsed_seconds;
+    }
+    
+    // Função para calcular o quarter ou overtime
+    function calculateQuarter1(elapsedSeconds: number): string {
         const quarterLength = 600; // 10 minutos (600 segundos) por quarter
-        const otLength = 300; // 5 minutos (300 segundos) por prorrogação (OT)
-        
+        const overtimeLength = 300; // 5 minutos (300 segundos) por prorrogação
+    
         if (elapsedSeconds <= 4 * quarterLength) {
-            // Estamos nos quatro primeiros quarters
-            const quarter = calculateQuarter(elapsedSeconds, quarterLength);
-            const timeInQuarter = elapsedSeconds % quarterLength; // Tempo decorrido dentro do quarter
-    
-            // Se estivermos exatamente no início de um quarter, marcamos o início do quarter
-            if (timeInQuarter === 0) {
-                if (quarter == 0) {
-                    return '10:00';
-                } else {
-                    return `Q${quarter}`; // Indica o início do quarter
-                }
-            }
-    
-            // Caso contrário, mostramos o tempo restante no quarter
-            return calculateTimeRemaining(elapsedSeconds, quarterLength);
+            const quarter = Math.floor(elapsedSeconds / quarterLength) + 1;
+            return `Q${quarter}`; // Retorna o número do quarter (Q1, Q2, Q3, Q4)
         } else {
-            // Estamos nas prorrogações
-            const otPeriod = Math.floor((elapsedSeconds - 4 * quarterLength) / otLength) + 1; // Calcula a prorrogação (OT1, OT2, etc.)
-            const timeInOT = (elapsedSeconds - 4 * quarterLength) % otLength; // Tempo decorrido dentro da prorrogação
-            const minutesRemainingOT = Math.floor((otLength - timeInOT) / 60); // Minutos restantes na prorrogação
-            const secondsRemainingOT = (otLength - timeInOT) % 60; // Segundos restantes na prorrogação
+            const overtimePeriod = Math.floor((elapsedSeconds - 4 * quarterLength) / overtimeLength) + 1;
+            return `OT${overtimePeriod}`; // Retorna o número da prorrogação (OT1, OT2, etc.)
+        }
+    }
+
+    function calculateQuarter2(elapsedSeconds: number): string {
+        const quarterLength = 600; // 10 minutos (600 segundos) por quarter
+        const overtimeLength = 300; // 5 minutos (300 segundos) por prorrogação
     
-            // Se estivermos exatamente no início de uma prorrogação, indicamos o início da prorrogação
-            if (timeInOT === 0) {
-                return `OT${otPeriod}`; // Indica o início da prorrogação
-            }
+        if (elapsedSeconds <= 4 * quarterLength) {
+            const quarter = Math.floor(elapsedSeconds / quarterLength) ;
+            return `Q${quarter}`; // Retorna o número do quarter (Q1, Q2, Q3, Q4)
+        } else {
+            const overtimePeriod = Math.floor((elapsedSeconds - 4 * quarterLength) / overtimeLength) ;
+            return `OT${overtimePeriod}`; // Retorna o número da prorrogação (OT1, OT2, etc.)
+        }
+    }
+
+    function calculateElapsedTimeInQuarter(elapsedSeconds: number): string {
+        const quarterLength = 600; // 10 minutos (600 segundos) por quarter
+        const overtimeLength = 300; // 5 minutos (300 segundos) por prorrogação
     
-            // Caso contrário, mostramos o tempo restante na prorrogação
+        if (elapsedSeconds <= 4 * quarterLength) {
+            const timeInQuarter = elapsedSeconds % quarterLength;
+            const minutesElapsed = Math.floor(timeInQuarter / 60);
+            const secondsElapsed = timeInQuarter % 60;
+            return `${minutesElapsed}:${secondsElapsed.toString().padStart(2, '0')}`;
+        } else {
+            const timeInOvertime = (elapsedSeconds - 4 * quarterLength) % overtimeLength;
+            const minutesElapsedOT = Math.floor(timeInOvertime / 60);
+            const secondsElapsedOT = timeInOvertime % 60;
+            return `${minutesElapsedOT}:${secondsElapsedOT.toString().padStart(2, '0')}`;
+        }
+    }
+    
+    // Função para calcular o tempo restante no quarter ou overtime
+    function calculateTimeRemainingInQuarter(elapsedSeconds: number): string {
+        const quarterLength = 600; // 10 minutos (600 segundos) por quarter
+        const overtimeLength = 300; // 5 minutos (300 segundos) por prorrogação
+    
+        if (elapsedSeconds <= 4 * quarterLength) {
+            const timeInQuarter = elapsedSeconds % quarterLength;
+            const minutesRemaining = Math.floor((quarterLength - timeInQuarter) / 60);
+            const secondsRemaining = (quarterLength - timeInQuarter) % 60;
+            return `${minutesRemaining}:${secondsRemaining.toString().padStart(2, '0')}`;
+        } else {
+            const timeInOvertime = (elapsedSeconds - 4 * quarterLength) % overtimeLength;
+            const minutesRemainingOT = Math.floor((overtimeLength - timeInOvertime) / 60);
+            const secondsRemainingOT = (overtimeLength - timeInOvertime) % 60;
             return `${minutesRemainingOT}:${secondsRemainingOT.toString().padStart(2, '0')}`;
         }
     }
+
       
       // Gerar as categorias no formato de quarters, prorrogações e tempo restante
     // const formattedCategories = four_factors.map(f => formatTimeForQuarterAndOT(f.elapsed_time));
@@ -25365,13 +25468,12 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
               });
               console.log(selected_point)
               instance.get_four_factors_breakdown(selected_point)
-
+            
               instance.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
               instance.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
               instance.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
               instance.fill_charts_four_factors(four_factors, 'DRB %', 'chart-drb', 'drb')
               instance.fill_charts_four_factors(four_factors, 'FTR %', 'chart-ftr', 'ft')
-
 
               console.log('Intervalo selecionado:', minCategory, 'a', maxCategory);
             } else {
@@ -25453,19 +25555,11 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           return { x: this.chart.chartWidth - labelWidth - 10, y: 10 };
         },
         formatter: function () {
-            const formattedTime = formatTimeForQuarterAndOT(Number(this.x));
-            let quarterIndicator = '';
-            
-            // Identifica se é um quarter ou overtime (OT)
-            if (formattedTime.includes('Q')) {
-                quarterIndicator = `Quarter: ${formattedTime}`;
-            } else if (formattedTime.includes('OT')) {
-                quarterIndicator = `Overtime: ${formattedTime}`;
-            } else {
-                quarterIndicator = `Quarter: ${Math.floor(Number(this.x) / 600) + 1}`;
-            }
+
+            const remaining_time = calculateTimeRemainingInQuarter(Number(this.x))
+            const quarter = calculateQuarter1(Number(this.x))
         
-            let s = `<b>${quarterIndicator}</b><br/><b>Remaining Time: ${formattedTime}</b><br/>`;
+            let s = `<b>${quarter} - ${remaining_time}</b></b><br/>`;
         
             if (this.points) {
                 this.points.forEach(function (point) {
@@ -25579,26 +25673,26 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           page: this.current_page
         }
       });
+      console.log(match_id, league_id, team_id)
       console.log(`Pesquisando página ${this.current_page} | Eventos: ${this.events.length}`)
       // Acumula os eventos da página atual
       const total_pages = Math.ceil(response['total'] / 100); // Ajuste o tamanho da página conforme necessário
-      let accumulatedEvents = this.events;
   
       // Verifica se há mais páginas para buscar
       if (this.current_page < total_pages) {
+        console.log('aqui')
         // Se há mais páginas, chama recursivamente para a próxima página
         this.current_page += 1
-        accumulatedEvents = accumulatedEvents.concat(response['data']);
+        this.events = this.events.concat(response['data']);
         console.log(response['data'].lenght)
         return await this.getAllMatchEvents(league_id, team_id, match_id);
       } else {
         const existingEventIds = new Set(this.events.map(event => event.event_id));
         const filteredData = response['data'].filter((item: any) => !existingEventIds.has(item.event_id));
         
-        accumulatedEvents = accumulatedEvents.concat(filteredData);
+        this.events = this.events.concat(filteredData);
         if (filteredData.length !== 0){
-            console.log(filteredData)
-            let four_factors = this.calculateFourFactors(accumulatedEvents);
+            let four_factors = this.calculateFourFactors(this.events);
             this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
             this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
             this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
@@ -25611,7 +25705,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             console.log('Sem nenhum novo evento')
         }
 
-        return accumulatedEvents;
+        return this.events;
       }
       
     } catch (error) {
@@ -25659,7 +25753,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         for (let i = 0; i < events.length; i++) {
             const event = events[i];
             const elapsed_time = ((event.time.quarter.id - 1) * 600) + event.time.quarter.elapsed_seconds;
-            const player_id = String(event.player.number) + ' - ' + event.player.nickname;
+            const player_id = event.player.id;
 
             if (min_elapsed_time !== null && max_elapsed_time !== null){
                 if (elapsed_time < min_elapsed_time || elapsed_time > max_elapsed_time){
@@ -25877,7 +25971,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                                     size: 'lg',
                                     centered: true
                                 });
-                                modalRef.componentInstance.data = { category: categoryName, selected_point: selected_point };
+                                modalRef.componentInstance.data = { category: categoryName, selected_point: selected_point, home_players: this.home_players, away_players: this.away_players};
                             });
                         }
                     }
@@ -25895,8 +25989,17 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             },
             yAxis: {
                 min: 0,
+                max: 105,
                 title: {
                     text: ''
+                },
+                labels: {
+                    formatter: function () {
+                        if (Number(this.value) > 100) {
+                            return ''; // Retorna uma string vazia para omitir labels maiores que 100
+                        }
+                        return this.value.toString(); // Retorna o valor como string para outros casos
+                    }
                 }
             },
             legend: {
@@ -25936,7 +26039,12 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 bar: {
                     dataLabels: {
                         enabled: true,
-                        format: '{point.y:.1f}%'
+                        inside: false,
+                        formatter: function () {
+                            // Acessa a cor do ponto
+                            const color = this.point.color;
+                            return `<span style="color: ${color};">${this.y?.toFixed(1)}%</span>`;
+                        }
                     },
                     grouping: true,
                     point: {
@@ -25958,7 +26066,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                                         size: 'lg',
                                         centered: true
                                     });
-                                    modalRef.componentInstance.data = { category: categoryName, selected_point: selected_point };
+                                    modalRef.componentInstance.data = { category: categoryName, selected_point: selected_point, home_players: this.home_players, away_players: this.away_players };
                                 });
                             }
                         }

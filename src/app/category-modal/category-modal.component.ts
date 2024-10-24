@@ -9,7 +9,7 @@ import * as Highcharts from 'highcharts';
 })
 
 export class CategoryModalComponent {
-  public data?: { category: string, selected_point: any };  // Inicializa a variável data
+  public data?: { category: string, selected_point: any, home_players: any, away_players: any};  // Inicializa a variável data
 
   constructor(public activeModal: NgbActiveModal) {}
 
@@ -17,12 +17,12 @@ export class CategoryModalComponent {
     if (this.data) {
       console.log(this.data.selected_point);
       console.log(this.data.category);
-      this.buildPlayerContributionCharts(this.data.selected_point, this.data.category);
+      this.buildPlayerContributionCharts(this.data.selected_point, this.data.category, this.data.home_players, this.data.away_players);
     }
   }
 
   // Função para construir gráficos
-  buildPlayerContributionCharts(selected_point: any, category: string = "efg") {
+  buildPlayerContributionCharts(selected_point: any, category: string = "efg", home_players: any, away_players: any) {
     const categoryMapping: { [key: string]: string } = {
         'eFG%': 'efg',
         'TOV%': 'tov',
@@ -75,19 +75,26 @@ export class CategoryModalComponent {
     }
     console.log(homeContributions)
     // Gera os gráficos para "home" e "away"
-    this.createChart('home-chart-container', 'Home Team Contributions', homeContributions);
-    this.createChart('away-chart-container', 'Away Team Contributions', awayContributions);
+    this.createChart('home-chart-container', 'Home Team Contributions', homeContributions, home_players);
+    this.createChart('away-chart-container', 'Away Team Contributions', awayContributions, away_players);
   }
 
   // Função para criar um gráfico de barras simples para as contribuições dos jogadores
-  createChart(containerId: string, title: string, data: any[]) {
+  createChart(containerId: string, title: string, data: any[], team_players:any) {
     const categories = ['Team']; // Uma única categoria para o time
-    const series = data.map((item, index) => ({
-      type: 'bar' as const,  // Corrigido para garantir que o tipo seja compatível
-      name: item.name,  // Nome do jogador
-      data: [item.value * 100],  // Valor do jogador
-      color: Highcharts.getOptions().colors?.[index] || undefined  // Atribui cores diferentes para cada jogador
-    }));
+    const series = data.map((item, index) => {
+      // Encontra o jogador correspondente em team_players usando o item.id
+      const player = team_players.find((player: any) => Number(player.id) === Number(item.name));
+      const nickname = player ? player.nickname : 'Unknown'; // Usa o nickname ou 'Unknown' se não encontrar
+      const color = player ? player.color : '#FFFFFF'; // Usa o nickname ou 'Unknown' se não encontrar
+
+      return {
+          type: 'bar' as const,  // Corrigido para garantir que o tipo seja compatível
+          name: nickname,  // Nome do jogador baseado no nickname
+          data: [item.value * 100],  // Valor do jogador
+          color: color // Atribui cores diferentes para cada jogador
+      };
+   });
   
     Highcharts.chart(containerId, {
       chart: {
@@ -127,7 +134,10 @@ export class CategoryModalComponent {
           stacking: 'normal',  // Empilhamento normal
           dataLabels: {
               enabled: true,
-              format: '{point.y:.1f}%'
+              format: '{point.y:.1f}%',
+              style: {
+                textOutline: 'none'
+              }
           },
         }
       }
