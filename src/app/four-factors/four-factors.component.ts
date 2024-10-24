@@ -25010,16 +25010,16 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
 
     ngOnInit(): void {
         this.startInterval();
-        // Inicialize dados ou faça chamadas para APIs se necessário
-        let four_factors = this.calculateFourFactors(this.events)
-        let selected_point = four_factors.at(-1)
+        // // Inicialize dados ou faça chamadas para APIs se necessário
+        // let four_factors = this.calculateFourFactors(this.events)
+        // let selected_point = four_factors.at(-1)
         
-        this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
-        this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
-        this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
-        this.fill_charts_four_factors(four_factors, 'DRB %', 'chart-drb', 'drb')
-        this.fill_charts_four_factors(four_factors, 'FTR %', 'chart-ftr', 'ft')
-        this.get_four_factors_breakdown(selected_point)
+        // this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
+        // this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
+        // this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
+        // this.fill_charts_four_factors(four_factors, 'DRB %', 'chart-drb', 'drb')
+        // this.fill_charts_four_factors(four_factors, 'FTR %', 'chart-ftr', 'ft')
+        // this.get_four_factors_breakdown(selected_point)
         
     }
 
@@ -25748,7 +25748,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             away: {}
         };
 
-        const four_factors: FourFactorsData[] = [];
+        let four_factors: FourFactorsData[] = [];
 
         for (let i = 0; i < events.length; i++) {
             const event = events[i];
@@ -25898,9 +25898,9 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                     : playerStats.rebotes_defesa / (teamDefensiveRebounds + opponentOffensiveRebounds);
             
                 // Calcular FT% do jogador usando as tentativas de lance livre do time como denominador
-                const ft = teamFreeThrowAttempts === 0
+                const ft = teamFieldGoalAttempts === 0
                     ? 0
-                    : playerStats.lances_livres_convertidos / teamFreeThrowAttempts;
+                    : playerStats.lances_livres_convertidos / teamFieldGoalAttempts;
             
                 return { efg, tov, orb, drb, ft };
             };
@@ -25925,10 +25925,13 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 current_evaluation.players.away[playerId] = calculatePlayerFactors(playerStats.away[playerId], stats.away, stats.home);
             });
 
-            if (four_factors.at(-1)?.elapsed_time !== elapsed_time)
-                four_factors.push(current_evaluation);
+            if (four_factors.at(-1)?.elapsed_time === elapsed_time){
+                four_factors = four_factors.slice(0, -1)
+            }
+            four_factors.push(current_evaluation);
         }
 
+        console.log(four_factors)
         console.log(four_factors.at(-1))
 
         return four_factors;
@@ -25937,6 +25940,49 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
 
 
     get_four_factors_breakdown(selected_point: any) {
+        const categories = ['eFG%', 'TOV%', 'ORB%', 'DRB%', 'FT%']; // Uma única categoria para o time
+
+
+        const homeSeries = this.home_players.map((player: any, index) => {
+            // Obtém as estatísticas do jogador pelo ID
+            const playerStats = selected_point.players.home[player.id];
+            return {
+                type: 'bar' as const,
+                name: player ? player.nickname : 'Unknown', // Usa o nickname do jogador
+                data: playerStats ? [
+                    playerStats.efg * 100,
+                    playerStats.tov * 100,
+                    playerStats.orb * 100,
+                    playerStats.drb * 100,
+                    playerStats.ft * 100
+                ] : [0, 0, 0, 0, 0], // Se não houver estatísticas, preenche com zeros
+                color: player ? player.color : '#FFFFFF', // Cor do jogador
+                stack: 'home' // Stack para a equipe "Home"
+            };
+        });
+        
+        // Cria as séries para jogadores da equipe "Away"
+        const awaySeries = this.away_players.map((player: any, index) => {
+            // Obtém as estatísticas do jogador pelo ID
+            const playerStats = selected_point.players.away[player.id];
+            return {
+                type: 'bar' as const,
+                name: player ? player.nickname : 'Unknown', // Usa o nickname do jogador
+                data: playerStats ? [
+                    playerStats.efg * 100,
+                    playerStats.tov * 100,
+                    playerStats.orb * 100,
+                    playerStats.drb * 100,
+                    playerStats.ft * 100
+                ] : [0, 0, 0, 0, 0], // Se não houver estatísticas, preenche com zeros
+                color: player ? player.color : '#FFFFFF', // Cor do jogador
+                stack: 'away' // Stack para a equipe "Away"
+            };
+        });
+    
+        // Combina as séries de "Home" e "Away"
+        const series = [...homeSeries, ...awaySeries];
+
         const instance = this 
         const chartOptions: Highcharts.Options = {
             chart: {
@@ -25981,7 +26027,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 text: ''
             },
             xAxis: {
-                categories: ['eFG%', 'TOV%', 'ORB%', 'DRB%', 'FT%'], // Categorias no eixo Y (barras horizontais)
+                categories: categories, // Categorias no eixo Y (barras horizontais)
                 title: {
                     text: null
                 },
@@ -25993,58 +26039,54 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 title: {
                     text: ''
                 },
-                labels: {
+                stackLabels: {
+                    enabled: true,
+                    style: {
+                        fontWeight: 'bold',
+                        color: (
+                            Highcharts.defaultOptions?.title?.style?.color
+                        ) || 'gray'
+                    },
                     formatter: function () {
-                        if (Number(this.value) > 100) {
-                            return ''; // Retorna uma string vazia para omitir labels maiores que 100
-                        }
-                        return this.value.toString(); // Retorna o valor como string para outros casos
+                        return `${this.total.toFixed(1)}%`;
                     }
                 }
             },
             legend: {
                 enabled: false
             },
-            series: [
-                {
-                    type: 'bar',
-                    name: 'Home',
-                    data: [
-                        selected_point.home.efg * 100,
-                        selected_point.home.tov * 100,
-                        selected_point.home.orb * 100,
-                        selected_point.home.drb * 100,
-                        selected_point.home.ft * 100
-                    ],
-                    color: 'blue'
-                },
-                {
-                    type: 'bar',
-                    name: 'Away',
-                    data: [
-                        selected_point.away.efg * 100,
-                        selected_point.away.tov * 100,
-                        selected_point.away.orb * 100,
-                        selected_point.away.drb * 100,
-                        selected_point.away.ft * 100
-                    ],
-                    color: 'red'
-                }
-            ],
+            series: series,
             tooltip: {
                 shared: true,
-                pointFormat: '<span style="color:{series.color}">{series.name}</span>: {point.y:.1f}%<br/>'
+                formatter: function () {
+                    let tooltipHtml = '';
+                    let homeHtml = '';
+                    let awayHtml = '';
+            
+                    // Itera sobre os pontos para separar jogadores de "home" e "away"
+                    this.points?.forEach((point: any) => {
+                        const isHome = point.series.options.stack === 'home';
+                        const lineHtml = `<span style="color:${point.series.color}">${point.series.name}</span>: ${point.y.toFixed(1)}%<br/>`;
+            
+                        if (isHome) {
+                            homeHtml += lineHtml;
+                        } else {
+                            awayHtml += lineHtml;
+                        }
+                    });
+            
+                    // Concatena o conteúdo do tooltip com um espaço entre os jogadores "Home" e "Away"
+                    tooltipHtml = homeHtml + '<br/>' + awayHtml;
+            
+                    return tooltipHtml;
+                },
+                useHTML: true // Permite o uso de HTML para estilizar o tooltip
             },
             plotOptions: {
                 bar: {
+                    stacking: 'normal', 
                     dataLabels: {
-                        enabled: true,
-                        inside: false,
-                        formatter: function () {
-                            // Acessa a cor do ponto
-                            const color = this.point.color;
-                            return `<span style="color: ${color};">${this.y?.toFixed(1)}%</span>`;
-                        }
+                        enabled: false,
                     },
                     grouping: true,
                     point: {
