@@ -13,6 +13,7 @@ interface FourFactorsMetrics {
     orb: number | null;
     drb: number | null;
     ft: number | null;
+    pontos: number | null;
 }
 
 interface FourFactorsData {
@@ -25469,6 +25470,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
               console.log(selected_point)
               instance.get_four_factors_breakdown(selected_point)
             
+              instance.fill_charts_four_factors(four_factors, 'Pontuação', 'chart-pontos', 'pontos')
               instance.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
               instance.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
               instance.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
@@ -25495,6 +25497,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
               // Função que você deseja chamar ao dar um double click em qualquer lugar do gráfico
               let four_factors = instance.calculateFourFactors(instance.events)
 
+              instance.fill_charts_four_factors(four_factors, 'Pontuação', 'chart-pontos', 'pontos')
               instance.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
               instance.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
               instance.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
@@ -25519,22 +25522,22 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           dashStyle: 'Solid', // Define o estilo da linha
         },
         categories: formattedCategories,
-        labels: {
-            step: 1, // Força a exibição de todos os labels
-            rotation: 0,
-            formatter: function () {
-              // Exibe apenas as labels relevantes (início de quarters e tempos restantes)
-              const label = formatTimeForQuarterAndOT(Number(this.value)) ;
-              return label.includes('Q') || label.includes('OT') ? label : ''; 
-            }
-          }
+        // labels: {
+        //     step: 1, // Força a exibição de todos os labels
+        //     rotation: 0,
+        //     formatter: function () {
+        //       // Exibe apenas as labels relevantes (início de quarters e tempos restantes)
+        //       const label = formatTimeForQuarterAndOT(Number(this.value)) ;
+        //       return label.includes('Q') || label.includes('OT') ? label : ''; 
+        //     }
+        //   }
       },
       yAxis: {
         title: {
           text: title
         },
         labels: {
-            format: '{value}%'
+            format: title === "Pontuação" ? '{value}' : '{value}%' // Define o formato baseado no título
         }
       },
       legend: {
@@ -25611,13 +25614,17 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         {
           type: 'line',
           name: 'Home',
-          data: four_factors.map(f => (f.home[serie] ?? null) !== null ? f.home[serie]! * 100 : null),
+          data: four_factors.map(f => (f.home[serie] ?? null) !== null 
+            ? (title === "Pontuação" ? f.home[serie]! : f.home[serie]! * 100) 
+            : null),
           color: 'blue'
         },
         {
           type: 'line',
           name: 'Away',
-          data: four_factors.map(f => (f.away[serie] ?? null) !== null ? f.away[serie]! * 100 : null),
+          data: four_factors.map(f => (f.away[serie] ?? null) !== null 
+            ? (title === "Pontuação" ? f.away[serie]! : f.away[serie]! * 100) 
+            : null),
           color: 'red'
         }
       ]
@@ -25693,6 +25700,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         this.events = this.events.concat(filteredData);
         if (filteredData.length !== 0){
             let four_factors = this.calculateFourFactors(this.events);
+            this.fill_charts_four_factors(four_factors, 'Pontuação', 'chart-pontos', 'pontos')   
             this.fill_charts_four_factors(four_factors, 'eFG %', 'chart-efg', 'efg')
             this.fill_charts_four_factors(four_factors, 'TOV %', 'chart-tov', 'tov')
             this.fill_charts_four_factors(four_factors, 'ORB %', 'chart-orb', 'orb')
@@ -25701,6 +25709,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
     
             let selected_point = four_factors.at(-1)
             this.get_four_factors_breakdown(selected_point)
+            console.log(four_factors)
         }else{
             console.log('Sem nenhum novo evento')
         }
@@ -25729,6 +25738,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             lances_livres_convertidos: 0,
             rebotes_ataque: 0,
             rebotes_defesa: 0,
+            pontos: 0
         },
         away: {
             tentativas_arremessos: 0,
@@ -25739,6 +25749,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             lances_livres_convertidos: 0,
             rebotes_ataque: 0,
             rebotes_defesa: 0,
+            pontos: 0,
         },
         };
 
@@ -25765,6 +25776,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                         orb: null,
                         drb: null,
                         ft: null,
+                        pontos: null
                         },
                         away: {
                         efg: null,
@@ -25772,6 +25784,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                         orb: null,
                         drb: null,
                         ft: null,
+                        pontos: null
                         },
                     });
                     continue
@@ -25786,6 +25799,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             // Inicializa as estatísticas do jogador se ainda não existirem para o time correspondente
             if (!playerStats[currentTeam][player_id]) {
                 playerStats[currentTeam][player_id] = {
+                    pontos: 0,
                     tentativas_arremessos: 0,
                     arremessos_convertidos: 0,
                     arremessos_3_convertidos: 0,
@@ -25831,6 +25845,22 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 }
             }
 
+            if (event.code === 'LLC'){
+                currentStats.pontos += 1;
+                currentPlayerStats.pontos += 1;
+            }
+
+            if (['ENT', 'A2C'].includes(event.code)){
+                currentStats.pontos += 2;
+                currentPlayerStats.pontos += 2;
+            }
+
+            if (event.code === 'A3C'){
+                currentStats.pontos += 3;
+                currentPlayerStats.pontos += 3;
+            }
+
+
             if (['ROE', 'REO'].includes(event.code)) {
                 currentStats.rebotes_ataque++;
                 currentPlayerStats.rebotes_ataque++;  // Atualiza também para o jogador
@@ -25847,14 +25877,22 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                     ? 0
                     : (sideStats.arremessos_convertidos + 0.5 * sideStats.arremessos_3_convertidos) / sideStats.tentativas_arremessos;
 
-                const tov = (sideStats.tentativas_arremessos + 0.44 * sideStats.tentativas_lance_livre + sideStats.turnouvers) === 0
-                    ? 0
-                    : sideStats.turnouvers / (sideStats.tentativas_arremessos + 0.44 * sideStats.tentativas_lance_livre + sideStats.turnouvers);
-
                 const orb = (sideStats.rebotes_ataque + oppositeStats.rebotes_defesa) === 0
                     ? 0
                     : sideStats.rebotes_ataque / (sideStats.rebotes_ataque + oppositeStats.rebotes_defesa);
+                    
+                const poss = sideStats.tentativas_arremessos + 0.4 * sideStats.tentativas_lance_livre - 1.07 * orb * (sideStats.tentativas_arremessos - sideStats.arremessos_convertidos) + sideStats.turnouvers
+                const poss_ot = oppositeStats.tentativas_arremessos + 0.4 * oppositeStats.tentativas_lance_livre - 1.07 * orb * (oppositeStats.tentativas_arremessos - oppositeStats.arremessos_convertidos) + oppositeStats.turnouvers
+                const poss_game = 0.5 * (poss + poss_ot)
 
+                const tov = poss_game === 0
+                    ? 0
+                    : sideStats.turnouvers / poss_game;
+
+                // const tov = (sideStats.tentativas_arremessos + 0.44 * sideStats.tentativas_lance_livre + sideStats.turnouvers) === 0
+                //     ? 0
+                //     : sideStats.turnouvers / (sideStats.tentativas_arremessos + 0.44 * sideStats.tentativas_lance_livre + sideStats.turnouvers);
+                    
                 const drb = (sideStats.rebotes_defesa + oppositeStats.rebotes_ataque) === 0
                     ? 0
                     : sideStats.rebotes_defesa / (sideStats.rebotes_defesa + oppositeStats.rebotes_ataque);
@@ -25863,7 +25901,9 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                     ? 0
                     : sideStats.lances_livres_convertidos / sideStats.tentativas_arremessos;
 
-                return { efg, tov, orb, drb, ft };
+                const pontos = sideStats.pontos
+
+                return { efg, tov, orb, drb, ft, pontos };
             };
 
             // Função para calcular Four Factors para jogadores
@@ -25901,8 +25941,10 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 const ft = teamFieldGoalAttempts === 0
                     ? 0
                     : playerStats.lances_livres_convertidos / teamFieldGoalAttempts;
+
+                const pontos = playerStats.pontos
             
-                return { efg, tov, orb, drb, ft };
+                return { efg, tov, orb, drb, ft,  pontos};
             };
 
             // Avaliação atual para times e jogadores
@@ -25925,14 +25967,11 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 current_evaluation.players.away[playerId] = calculatePlayerFactors(playerStats.away[playerId], stats.away, stats.home);
             });
 
-            if (four_factors.at(-1)?.elapsed_time === elapsed_time){
-                four_factors = four_factors.slice(0, -1)
-            }
+            // if (four_factors.at(-1)?.elapsed_time === elapsed_time){
+            //     four_factors = four_factors.slice(0, -1)
+            // }
             four_factors.push(current_evaluation);
         }
-
-        console.log(four_factors)
-        console.log(four_factors.at(-1))
 
         return four_factors;
     }
