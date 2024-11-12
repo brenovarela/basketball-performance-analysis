@@ -34,6 +34,8 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
     constructor(private modalService: NgbModal, private zone: NgZone) {} // Injeção do NgbModal e NgZone
     intervalId: any;
 
+    match_is_ongoing = false
+
     startInterval(segundos = 10) {
         this.intervalId = setInterval(async () => {
             const selected_league = $('#select-league').val(); // Obtém o valor selecionado
@@ -41,10 +43,13 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             const selected_match = $('#select-match').val();
 
             if (selected_match !== null && selected_match !== ''){
-                console.log(selected_match)
-                // this.current_page = 1
-                // this.events = []
-                this.events = await this.getAllMatchEvents(selected_league, selected_team, selected_match); // Chama a função a cada 30 segundos
+                this.is_match_ongoing(selected_league, selected_match)
+                if (this.match_is_ongoing){
+                    console.log('teste')
+                    this.events = await this.getAllMatchEvents(selected_league, selected_team, selected_match); // Chama a função a cada 30 segundos
+                    console.log(this.events)
+                }
+
             }
         }, segundos * 1000); // 30000 milissegundos = 30 segundos
     }
@@ -54,6 +59,8 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
             clearInterval(this.intervalId); // Limpa o intervalo
         }
     }
+
+
 
     
 
@@ -25100,6 +25107,24 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
         this.clearInterval();
     }
 
+    is_match_ongoing(league_id: number, match_id: number){
+        const apiUrl = `https://apibird.tecgraf.puc-rio.br/v1/matches/${league_id}/${match_id}/ongoing`; 
+
+        $.ajax({
+            url: apiUrl,
+            method: 'GET',
+            headers: {
+                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhcGlfdG9rZW46MyIsInNjb3BlcyI6ImNvcmUifQ.CQgdjWXTWTtr9pwUliGo0__1_5rcEHj4tTxqpCZUekc' // Adiciona o cabeçalho de autorização
+            },
+            success: (data: boolean) => {
+                this.match_is_ongoing = data
+            },
+            error: (error: Record<string, any>) => {
+                console.error('Erro ao carregar os dados:', error);
+            }
+            });
+    }
+
     fill_select_leagues(): void {
         // URL da API - substitua pelo endpoint real da sua API
         const apiUrl = 'https://apibird.tecgraf.puc-rio.br/v1/leagues'; 
@@ -25457,6 +25482,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
               const maxCategory = Number(categories[maxIndex]);
 
               let four_factors = instance.calculateFourFactors(instance.events, minCategory, maxCategory)
+              console.log(four_factors)
               let selected_point = [...four_factors].reverse().find(obj => {
                 // Verifica se algum valor em 'home' não é null
                 const homeHasValues = Object.values(obj.home).some(value => value !== null);
@@ -25522,15 +25548,15 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           dashStyle: 'Solid', // Define o estilo da linha
         },
         categories: formattedCategories,
-        // labels: {
-        //     step: 1, // Força a exibição de todos os labels
-        //     rotation: 0,
-        //     formatter: function () {
-        //       // Exibe apenas as labels relevantes (início de quarters e tempos restantes)
-        //       const label = formatTimeForQuarterAndOT(Number(this.value)) ;
-        //       return label.includes('Q') || label.includes('OT') ? label : ''; 
-        //     }
-        //   }
+        labels: {
+            step: 1, // Força a exibição de todos os labels
+            rotation: 0,
+            formatter: function () {
+              // Exibe apenas as labels relevantes (início de quarters e tempos restantes)
+              const label = formatTimeForQuarterAndOT(Number(this.value)) ;
+              return label.includes('Q') || label.includes('OT') ? label : ''; 
+            }
+          }
       },
       yAxis: {
         title: {
@@ -25558,33 +25584,33 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
           return { x: this.chart.chartWidth - labelWidth - 10, y: 10 };
         },
         formatter: function () {
-
-            const remaining_time = calculateTimeRemainingInQuarter(Number(this.x))
-            const quarter = calculateQuarter1(Number(this.x))
+            const remaining_time = calculateTimeRemainingInQuarter(Number(this.x));
+            const quarter = calculateQuarter1(Number(this.x));
         
-            let s = `<b>${quarter} - ${remaining_time}</b></b><br/>`;
+            let s = `<b>${quarter} - ${remaining_time}</b></br>`;
         
             if (this.points) {
                 this.points.forEach(function (point) {
-                s +=
-                    '<span style="color:' +
-                    point.color +
-                    '">'+point.series.name + '</span> ' +
-                    ': ' +
-                    point.y?.toFixed(2) +
-                    '%' +
-                    '<br/>';
+                    // Condição para verificar se o gráfico é de pontuação
+                    const isScoreChart = title === 'Pontuação';
+                    s +=
+                        '<span style="color:' +
+                        point.color +
+                        '">' + point.series.name + '</span>: ' +
+                        point.y?.toFixed(isScoreChart ? 0 : 2) + // Formata como inteiro se for gráfico de pontuação
+                        (isScoreChart ? '' : '%') + // Adiciona '%' apenas se não for gráfico de pontuação
+                        '<br/>';
                 });
             } else if (this.point) {
+                const isScoreChart = title === 'Pontuação';
                 s +=
-                '<span style="color:' +
-                this.point.color +
-                '">\u25CF</span> ' +
-                this.point.series.name +
-                ': ' +
-                this.point.y?.toFixed(2) +
-                '%' +
-                '<br/>';
+                    '<span style="color:' +
+                    this.point.color +
+                    '">\u25CF</span> ' +
+                    this.point.series.name + ': ' +
+                    this.point.y?.toFixed(isScoreChart ? 0 : 2) +
+                    (isScoreChart ? '' : '%') +
+                    '<br/>';
             }
             return s;
         }
@@ -25636,7 +25662,7 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
   }
 
   updateSpecificChartsCrosshair(xIndex: number | null) {
-    const chartIds = ['chart-efg', 'chart-tov', 'chart-orb', 'chart-drb', 'chart-ftr']; // IDs dos gráficos
+    const chartIds = ['chart-efg', 'chart-tov', 'chart-orb', 'chart-drb', 'chart-ftr', 'chart-pontos']; // IDs dos gráficos
   
     chartIds.forEach(chartId => {
       const chart = $(`#${chartId}`).highcharts()// Obtém o gráfico pelo ID do contêiner
@@ -25768,6 +25794,10 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
 
             if (min_elapsed_time !== null && max_elapsed_time !== null){
                 if (elapsed_time < min_elapsed_time || elapsed_time > max_elapsed_time){
+                    if (four_factors.at(-1)?.elapsed_time === elapsed_time){
+                        four_factors = four_factors.slice(0, -1)
+                    }
+            
                     four_factors.push({
                         elapsed_time: elapsed_time,
                         home: {
@@ -25921,17 +25951,25 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 const efg = teamFieldGoalAttempts === 0
                     ? 0
                     : (playerStats.arremessos_convertidos + 0.5 * playerStats.arremessos_3_convertidos) / teamFieldGoalAttempts;
-            
-                // Calcular TOV% do jogador usando as tentativas de arremesso do time, lances livres e turnovers do time como denominador
-                const tov = (teamFieldGoalAttempts + 0.44 * teamFreeThrowAttempts + teamTurnovers) === 0
-                    ? 0
-                    : playerStats.turnouvers / (teamFieldGoalAttempts + 0.44 * teamFreeThrowAttempts + teamTurnovers);
-            
-                // Calcular ORB% do jogador usando rebotes ofensivos do time e defensivos do adversário como denominador
+
                 const orb = (teamOffensiveRebounds + opponentDefensiveRebounds) === 0
                     ? 0
                     : playerStats.rebotes_ataque / (teamOffensiveRebounds + opponentDefensiveRebounds);
             
+                const poss = teamStats.tentativas_arremessos + 0.4 * teamStats.tentativas_lance_livre - 1.07 * orb * (teamStats.tentativas_arremessos - teamStats.arremessos_convertidos) + teamStats.turnouvers
+                const poss_ot = opponentStats.tentativas_arremessos + 0.4 * opponentStats.tentativas_lance_livre - 1.07 * orb * (opponentStats.tentativas_arremessos - opponentStats.arremessos_convertidos) + opponentStats.turnouvers
+                const poss_game = 0.5 * (poss + poss_ot)
+
+                const tov = poss_game === 0
+                    ? 0
+                    : playerStats.turnouvers / poss_game;
+            
+                // Calcular TOV% do jogador usando as tentativas de arremesso do time, lances livres e turnovers do time como denominador
+                // const tov = (teamFieldGoalAttempts + 0.44 * teamFreeThrowAttempts + teamTurnovers) === 0
+                //     ? 0
+                //     : playerStats.turnouvers / (teamFieldGoalAttempts + 0.44 * teamFreeThrowAttempts + teamTurnovers);
+            
+                // Calcular ORB% do jogador usando rebotes ofensivos do time e defensivos do adversário como denominador
                 // Calcular DRB% do jogador usando rebotes defensivos do time e ofensivos do adversário como denominador
                 const drb = (teamDefensiveRebounds + opponentOffensiveRebounds) === 0
                     ? 0
@@ -25967,9 +26005,9 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 current_evaluation.players.away[playerId] = calculatePlayerFactors(playerStats.away[playerId], stats.away, stats.home);
             });
 
-            // if (four_factors.at(-1)?.elapsed_time === elapsed_time){
-            //     four_factors = four_factors.slice(0, -1)
-            // }
+            if (four_factors.at(-1)?.elapsed_time === elapsed_time){
+                four_factors = four_factors.slice(0, -1)
+            }
             four_factors.push(current_evaluation);
         }
 
