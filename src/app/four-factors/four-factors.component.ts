@@ -25910,9 +25910,13 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 const orb = (sideStats.rebotes_ataque + oppositeStats.rebotes_defesa) === 0
                     ? 0
                     : sideStats.rebotes_ataque / (sideStats.rebotes_ataque + oppositeStats.rebotes_defesa);
+
+                const orb_ot = (sideStats.rebotes_ataque + oppositeStats.rebotes_defesa) === 0
+                    ? 0
+                    : oppositeStats.rebotes_ataque / (sideStats.rebotes_ataque + oppositeStats.rebotes_defesa);
                     
                 const poss = sideStats.tentativas_arremessos + 0.4 * sideStats.tentativas_lance_livre - 1.07 * orb * (sideStats.tentativas_arremessos - sideStats.arremessos_convertidos) + sideStats.turnouvers
-                const poss_ot = oppositeStats.tentativas_arremessos + 0.4 * oppositeStats.tentativas_lance_livre - 1.07 * orb * (oppositeStats.tentativas_arremessos - oppositeStats.arremessos_convertidos) + oppositeStats.turnouvers
+                const poss_ot = oppositeStats.tentativas_arremessos + 0.4 * oppositeStats.tentativas_lance_livre - 1.07 * orb_ot * (oppositeStats.tentativas_arremessos - oppositeStats.arremessos_convertidos) + oppositeStats.turnouvers
                 const poss_game = 0.5 * (poss + poss_ot)
 
                 const tov = poss_game === 0
@@ -25955,9 +25959,18 @@ export class FourFactorsComponent implements OnInit, AfterViewInit {
                 const orb = (teamOffensiveRebounds + opponentDefensiveRebounds) === 0
                     ? 0
                     : playerStats.rebotes_ataque / (teamOffensiveRebounds + opponentDefensiveRebounds);
+
+
+                const orb_team = (teamOffensiveRebounds + opponentDefensiveRebounds) === 0
+                    ? 0
+                    : teamStats.rebotes_ataque / (teamOffensiveRebounds + opponentDefensiveRebounds);
+
+                const orb_ot = (teamOffensiveRebounds + opponentDefensiveRebounds) === 0
+                    ? 0
+                    : opponentStats.rebotes_ataque / (teamOffensiveRebounds + opponentDefensiveRebounds);
             
-                const poss = teamStats.tentativas_arremessos + 0.4 * teamStats.tentativas_lance_livre - 1.07 * orb * (teamStats.tentativas_arremessos - teamStats.arremessos_convertidos) + teamStats.turnouvers
-                const poss_ot = opponentStats.tentativas_arremessos + 0.4 * opponentStats.tentativas_lance_livre - 1.07 * orb * (opponentStats.tentativas_arremessos - opponentStats.arremessos_convertidos) + opponentStats.turnouvers
+                const poss = teamStats.tentativas_arremessos + 0.4 * teamStats.tentativas_lance_livre - 1.07 * orb_team * (teamStats.tentativas_arremessos - teamStats.arremessos_convertidos) + teamStats.turnouvers
+                const poss_ot = opponentStats.tentativas_arremessos + 0.4 * opponentStats.tentativas_lance_livre - 1.07 * orb_ot * (opponentStats.tentativas_arremessos - opponentStats.arremessos_convertidos) + opponentStats.turnouvers
                 const poss_game = 0.5 * (poss + poss_ot)
 
                 const tov = poss_game === 0
